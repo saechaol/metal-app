@@ -17,6 +17,8 @@
 		41A8B9AA2978A2A400A97F5C /* metalappUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A8B9A92978A2A400A97F5C /* metalappUITestsLaunchTests.swift */; };
 		41A8B9B72978A41F00A97F5C /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A8B9B62978A41F00A97F5C /* Renderer.swift */; };
 		41A8B9B92978A58400A97F5C /* teapot.obj in Resources */ = {isa = PBXBuildFile; fileRef = 41A8B9B82978A58400A97F5C /* teapot.obj */; };
+		41A8B9BB2978A86E00A97F5C /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 41A8B9BA2978A86E00A97F5C /* Shaders.metal */; };
+		41A8B9BD2978B32300A97F5C /* MathUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A8B9BC2978B32300A97F5C /* MathUtilities.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +53,8 @@
 		41A8B9A92978A2A400A97F5C /* metalappUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = metalappUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		41A8B9B62978A41F00A97F5C /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
 		41A8B9B82978A58400A97F5C /* teapot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = teapot.obj; sourceTree = "<group>"; };
+		41A8B9BA2978A86E00A97F5C /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
+		41A8B9BC2978B32300A97F5C /* MathUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathUtilities.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,7 +106,9 @@
 			isa = PBXGroup;
 			children = (
 				41A8B9862978A2A200A97F5C /* AppDelegate.swift */,
+				41A8B9BC2978B32300A97F5C /* MathUtilities.swift */,
 				41A8B9B62978A41F00A97F5C /* Renderer.swift */,
+				41A8B9BA2978A86E00A97F5C /* Shaders.metal */,
 				41A8B9B82978A58400A97F5C /* teapot.obj */,
 				41A8B98A2978A2A200A97F5C /* ViewController.swift */,
 				41A8B98C2978A2A200A97F5C /* Main.storyboard */,
@@ -262,9 +268,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				41A8B9BB2978A86E00A97F5C /* Shaders.metal in Sources */,
 				41A8B98B2978A2A200A97F5C /* ViewController.swift in Sources */,
 				41A8B9B72978A41F00A97F5C /* Renderer.swift in Sources */,
 				41A8B9872978A2A200A97F5C /* AppDelegate.swift in Sources */,
+				41A8B9BD2978B32300A97F5C /* MathUtilities.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
