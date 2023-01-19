@@ -32,11 +32,16 @@ class Renderer: NSObject, MTKViewDelegate {
     let commandQueue: MTLCommandQueue
     let depthStencilState: MTLDepthStencilState
     let samplerState: MTLSamplerState
+    let scene: Scene
     var renderPipeline: MTLRenderPipelineState // create render pipeline state
     var vertexDescriptor: MDLVertexDescriptor
-    var meshes: [MTKMesh] = []
     var time: Float = 0 // called when view changes size
+    var cameraWorldPosition = SIMD3<Float>(0, 0, 2)
+    var viewMatrix = matrix_identity_float4x4
+    var projectionMatrix = matrix_identity_float4x4
     var baseColorTexture: MTLTexture?
+    
+    static let fishCount = 12
     
     init(view: MTKView, device: MTLDevice) {
         self.device = device
@@ -58,32 +63,59 @@ class Renderer: NSObject, MTKViewDelegate {
         renderPipeline = Renderer.buildPipeline(device: device, view: view, vertexDescriptor: vertexDescriptor)
         depthStencilState = Renderer.buildDepthStencilState(device: device)
         samplerState = Renderer.buildSamplerState(device: device)
+        scene = Renderer.buildScene(device: device, vertexDescriptor: vertexDescriptor)
         super.init()
-        loadResources()
     }
     
-    func loadResources() {
-        let modelURL = Bundle.main.url(forResource: "teapot", withExtension: "obj")!
+    static func buildScene(device: MTLDevice, vertexDescriptor: MDLVertexDescriptor) -> Scene {
         let bufferAllocator = MTKMeshBufferAllocator(device: device)
-        
-        /**
-         Create an MDLAsset.
-         - an asset can have lights, cameras, and meshes, but for now we just care about meshes
-         */
-        let asset = MDLAsset(url: modelURL, vertexDescriptor: vertexDescriptor, bufferAllocator: bufferAllocator)
-        
-        /**
-         Fetch MTKMesh collection
-         */
-        do {
-            (_, meshes) = try MTKMesh.newMeshes(asset: asset, device: device)
-        } catch {
-            fatalError("Could not extract meshes from Model I/O asset")
-        }
-        
         let textureLoader = MTKTextureLoader(device: device)
         let options: [MTKTextureLoader.Option: Any] = [.generateMipmaps: true, .SRGB: true]
-        baseColorTexture = try? textureLoader.newTexture(name: "tiles_baseColor", scaleFactor: 1.0, bundle: nil, options: options)
+        
+        let scene = Scene()
+        
+        scene.ambientLightColor = SIMD3<Float>(0.1, 0.1, 0.1)
+        
+        let light0 = Light(worldPosition: SIMD3<Float>(5, 5, 0), color: SIMD3<Float>(0.3, 0.3, 0.3))
+        let light1 = Light(worldPosition: SIMD3<Float>(-5, 5, 0), color: SIMD3<Float>(0.3, 0.3, 0.3))
+        let light2 = Light(worldPosition: SIMD3<Float>(0, -5, 0), color: SIMD3<Float>(0.3, 0.3, 0.3))
+        
+        scene.lights = [light0, light1, light2]
+        
+        let bob = Node(name: "Bob")
+        let bobMaterial = Material()
+        let bobBaseColorTexture = try? textureLoader.newTexture(name: "bob_baseColor", scaleFactor: 1.0, bundle: nil, options: options)
+        
+        bobMaterial.baseColorTexture = bobBaseColorTexture
+        bobMaterial.specularPower = 100
+        bobMaterial.specularColor = SIMD3<Float>(0.8, 0.8, 0.8)
+        bob.material = bobMaterial
+        
+        let bobURL = Bundle.main.url(forResource: "bob", withExtension: "obj")!
+        let bobAsset = MDLAsset(url: bobURL, vertexDescriptor: vertexDescriptor, bufferAllocator: bufferAllocator)
+        bob.mesh = try! MTKMesh.newMeshes(asset: bobAsset, device: device).metalKitMeshes.first!
+        
+        scene.rootNode.children.append(bob)
+        
+        let blubMaterial = Material()
+        let blubBaseColorTexture = try? textureLoader.newTexture(name: "blub_baseColor", scaleFactor: 1.0, bundle: nil, options: options)
+        
+        blubMaterial.baseColorTexture = blubBaseColorTexture
+        blubMaterial.specularPower = 40
+        blubMaterial.specularColor = SIMD3<Float>(0.8, 0.8, 0.8)
+        
+        let blubURL = Bundle.main.url(forResource: "blub", withExtension: "obj")!
+        let blubAsset = MDLAsset(url: blubURL, vertexDescriptor: vertexDescriptor, bufferAllocator: bufferAllocator)
+        let blubMesh = try! MTKMesh.newMeshes(asset: blubAsset, device: device).metalKitMeshes.first!
+        
+        for i in 1...fishCount {
+            let blub = Node(name: "Blub \(i)")
+            blub.material = blubMaterial
+            blub.mesh = blubMesh
+            bob.children.append(blub)
+        }
+        
+        return scene
     }
     
     static func buildVertexDescriptor() -> MDLVertexDescriptor {
@@ -190,74 +222,91 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     func draw(in view: MTKView) {
-        /**
-         One command buffer is generated per frame
-         - when asked to render a frame by MTKView, a command buffer is created in which rendering commands are encoded to
-         - encoding translates API calls into commands understood by the GPU
-         */
+        update(view)
+        
         let commandBuffer = commandQueue.makeCommandBuffer()!
-        /**
-         Tells Metal which texture that will be drawn into
-         - configured with pixel format of one of those textures
-         - drawable is an object that holds color texture and knows how to present it
-         */
         if let renderPassDescriptor = view.currentRenderPassDescriptor, let drawable = view.currentDrawable {
+            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.63, 0.81, 1.0, 1.0)
             let commandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-            
-            time += 1 / Float(view.preferredFramesPerSecond)
-            let angle = -time
-            
-            let cameraWorldPosition = SIMD3<Float>(0, 0, 2)
-            let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 2)
-            let viewMatrix = float4x4(translateBy: -cameraWorldPosition)
-            
-            let modelViewMatrix = viewMatrix * modelMatrix
-            let aspectRatio = Float(view.drawableSize.width / view.drawableSize.height)
-            let projectionMatrix = float4x4(perspectiveProjectionMatrix: Float.pi / 3, aspectRatio: aspectRatio, nearZ: 0.1, farZ: 100)
-            let viewProjectionMatrix = projectionMatrix * viewMatrix
-            
-            var vertexUniforms = VertexUniforms(modelMatrix: modelViewMatrix, viewProjectionMatrix: viewProjectionMatrix, normalMatrix: modelMatrix.normalMatrix)
-            
-            let material = Material()
-            material.specularPower = 200
-            material.specularColor = SIMD3<Float>(0.8, 0.8, 0.8)
-            
-            let light0 = Light(worldPosition: SIMD3<Float>(2, 2, 2), color: SIMD3<Float>(1, 0, 0))
-            let light1 = Light(worldPosition: SIMD3<Float>(-2, 2, 2), color: SIMD3<Float>(0, 1, 0))
-            let light2 = Light(worldPosition: SIMD3<Float>(0, -2, 2), color: SIMD3<Float>(0, 0, 1))
-            
-            var fragmentUniforms = FragmentUniforms(cameraWorldPosition: cameraWorldPosition,
-                                                    ambientLightColor: SIMD3<Float>(0.1, 0.1, 0.1),
-                                                    specularColor: material.specularColor,
-                                                    specularPower: material.specularPower,
-                                                    light0: light0,
-                                                    light1: light1,
-                                                    light2: light2)
-            commandEncoder.setFragmentBytes(&fragmentUniforms, length: MemoryLayout<FragmentUniforms>.size, index: 0)
-            
-            commandEncoder.setVertexBytes(&vertexUniforms, length: MemoryLayout<VertexUniforms>.size, index: 1)
-            commandEncoder.setRenderPipelineState(renderPipeline)
+            commandEncoder.setFrontFacing(.counterClockwise)
+            commandEncoder.setCullMode(.back)
             commandEncoder.setDepthStencilState(depthStencilState)
-            commandEncoder.setFragmentTexture(baseColorTexture, index: 0)
+            commandEncoder.setRenderPipelineState(renderPipeline)
             commandEncoder.setFragmentSamplerState(samplerState, index: 0)
-            
-            for mesh in meshes {
-                let vertexBuffer = mesh.vertexBuffers.first!
-                commandEncoder.setVertexBuffer(vertexBuffer.buffer, offset: vertexBuffer.offset, index: 0)
-                
-                for submesh in mesh.submeshes {
-                    let indexBuffer = submesh.indexBuffer
-                    commandEncoder.drawIndexedPrimitives(type: submesh.primitiveType,
-                                                         indexCount: submesh.indexCount,
-                                                         indexType: submesh.indexType,
-                                                         indexBuffer: indexBuffer.buffer,
-                                                         indexBufferOffset: indexBuffer.offset)
-                }
-            }
-            
+            drawNodeRecursive(scene.rootNode, parentTransform: matrix_identity_float4x4, commandEncoder: commandEncoder)
             commandEncoder.endEncoding()
             commandBuffer.present(drawable)
             commandBuffer.commit()
+        }
+    }
+    
+    func drawNodeRecursive(_ node: Node, parentTransform: float4x4, commandEncoder: MTLRenderCommandEncoder) {
+        let modelMatrix = parentTransform * node.modelMatrix
+        
+        if let mesh = node.mesh, let baseColorTexture = node.material.baseColorTexture {
+            let viewProjectionMatrix = projectionMatrix * viewMatrix
+            var vertexUniforms = VertexUniforms(modelMatrix: modelMatrix, viewProjectionMatrix: viewProjectionMatrix, normalMatrix: modelMatrix.normalMatrix)
+            commandEncoder.setVertexBytes(&vertexUniforms, length: MemoryLayout<VertexUniforms>.size, index: 1)
+            
+            var fragmentUniforms = FragmentUniforms(cameraWorldPosition: cameraWorldPosition,
+                                                    ambientLightColor: scene.ambientLightColor,
+                                                    specularColor: node.material.specularColor,
+                                                    specularPower: node.material.specularPower,
+                                                    light0: scene.lights[0],
+                                                    light1: scene.lights[1],
+                                                    light2: scene.lights[2])
+            commandEncoder.setFragmentBytes(&fragmentUniforms, length: MemoryLayout<FragmentUniforms>.size, index: 0)
+            commandEncoder.setFragmentTexture(baseColorTexture, index: 0)
+            
+            let vertexBuffer = mesh.vertexBuffers.first!
+            commandEncoder.setVertexBuffer(vertexBuffer.buffer, offset: vertexBuffer.offset, index: 0)
+            
+            for submesh in mesh.submeshes {
+                let indexBuffer = submesh.indexBuffer
+                commandEncoder.drawIndexedPrimitives(type: submesh.primitiveType,
+                                                     indexCount: submesh.indexCount,
+                                                     indexType: submesh.indexType,
+                                                     indexBuffer: indexBuffer.buffer,
+                                                     indexBufferOffset: indexBuffer.offset)
+            }
+        }
+        
+        for child in node.children {
+            drawNodeRecursive(child, parentTransform: modelMatrix, commandEncoder: commandEncoder)
+        }
+    }
+    
+    func update(_ view: MTKView) {
+        time += 1 / Float(view.preferredFramesPerSecond)
+        cameraWorldPosition = SIMD3<Float>(0, 0, 2)
+        viewMatrix = float4x4(translateBy: -cameraWorldPosition) * float4x4(rotateAbout: SIMD3<Float>(1, 0, 0), by: .pi / 6)
+        
+        let aspectRatio = Float(view.drawableSize.width / view.drawableSize.height)
+        projectionMatrix = float4x4(perspectiveProjectionMatrix: Float.pi / 6, aspectRatio: aspectRatio, nearZ: 0.01, farZ: 100)
+        
+        let angle = -time
+        scene.rootNode.modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 0.5)
+        
+        if let bob = scene.nodeNamed("Bob") {
+            bob.modelMatrix = float4x4(translateBy: SIMD3<Float>(0, 0.015 * sin(time * 5), 0))
+        }
+        
+        let blubBaseTransform = float4x4(rotateAbout: SIMD3<Float>(0, 0, 1), by: -.pi / 2) * float4x4(scaleBy: 0.25) * float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: -.pi / 2)
+        
+        let fishCount = Renderer.fishCount
+        for i in 1...fishCount {
+            if let blub = scene.nodeNamed("Blub \(i)") {
+                let pivotPosition = SIMD3<Float>(0.4, 0, 0)
+                let rotationOffset = SIMD3<Float>(0.4, 0, 0)
+                let rotationSpeed = Float(0.3)
+                let rotationAngle = 2 * Float.pi * Float(rotationSpeed * time) + (2 * Float.pi / Float(fishCount) * Float(i - 1))
+                let horizontalAngle = 2 * .pi / Float(fishCount) * Float(i - 1)
+                blub.modelMatrix =  float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: horizontalAngle) *
+                                    float4x4(translateBy: rotationOffset) *
+                                    float4x4(rotateAbout: SIMD3<Float>(0, 0, 1), by: rotationAngle) *
+                                    float4x4(translateBy: pivotPosition) *
+                                    blubBaseTransform
+            }
         }
     }
 }
