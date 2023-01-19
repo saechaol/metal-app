@@ -162,7 +162,7 @@ class Renderer: NSObject, MTKViewDelegate {
             time += 1 / Float(view.preferredFramesPerSecond)
             let angle = -time
             
-            let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 0.1)
+            let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 1)
             let viewMatrix = float4x4(translateBy: SIMD3<Float>(0, 0, -2))
             
             let modelViewMatrix = viewMatrix * modelMatrix
