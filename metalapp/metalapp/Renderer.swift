@@ -10,10 +10,20 @@ import MetalKit
 import ModelIO // loads 3d data
 import simd
 
-struct Uniforms {
+struct VertexUniforms {
     var modelMatrix: float4x4
     var viewProjectionMatrix: float4x4
     var normalMatrix: float3x3
+}
+
+struct FragmentUniforms {
+    var cameraWorldPosition = SIMD3<Float>(0, 0, 0)
+    var ambientLightColor = SIMD3<Float>(0, 0, 0)
+    var specularColor = SIMD3<Float>(1, 1, 1)
+    var specularPower = Float(1)
+    var light0 = Light()
+    var light1 = Light()
+    var light2 = Light()
 }
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -186,7 +196,6 @@ class Renderer: NSObject, MTKViewDelegate {
          - encoding translates API calls into commands understood by the GPU
          */
         let commandBuffer = commandQueue.makeCommandBuffer()!
-        
         /**
          Tells Metal which texture that will be drawn into
          - configured with pixel format of one of those textures
@@ -198,17 +207,35 @@ class Renderer: NSObject, MTKViewDelegate {
             time += 1 / Float(view.preferredFramesPerSecond)
             let angle = -time
             
+            let cameraWorldPosition = SIMD3<Float>(0, 0, 2)
             let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 2)
-            let viewMatrix = float4x4(translateBy: SIMD3<Float>(0, 0, -2))
+            let viewMatrix = float4x4(translateBy: -cameraWorldPosition)
             
             let modelViewMatrix = viewMatrix * modelMatrix
             let aspectRatio = Float(view.drawableSize.width / view.drawableSize.height)
             let projectionMatrix = float4x4(perspectiveProjectionMatrix: Float.pi / 3, aspectRatio: aspectRatio, nearZ: 0.1, farZ: 100)
             let viewProjectionMatrix = projectionMatrix * viewMatrix
             
-            var uniforms = Uniforms(modelMatrix: modelViewMatrix, viewProjectionMatrix: viewProjectionMatrix, normalMatrix: modelMatrix.normalMatrix)
+            var vertexUniforms = VertexUniforms(modelMatrix: modelViewMatrix, viewProjectionMatrix: viewProjectionMatrix, normalMatrix: modelMatrix.normalMatrix)
             
-            commandEncoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.size, index: 1)
+            let material = Material()
+            material.specularPower = 200
+            material.specularColor = SIMD3<Float>(0.8, 0.8, 0.8)
+            
+            let light0 = Light(worldPosition: SIMD3<Float>(2, 2, 2), color: SIMD3<Float>(1, 0, 0))
+            let light1 = Light(worldPosition: SIMD3<Float>(-2, 2, 2), color: SIMD3<Float>(0, 1, 0))
+            let light2 = Light(worldPosition: SIMD3<Float>(0, -2, 2), color: SIMD3<Float>(0, 0, 1))
+            
+            var fragmentUniforms = FragmentUniforms(cameraWorldPosition: cameraWorldPosition,
+                                                    ambientLightColor: SIMD3<Float>(0.1, 0.1, 0.1),
+                                                    specularColor: material.specularColor,
+                                                    specularPower: material.specularPower,
+                                                    light0: light0,
+                                                    light1: light1,
+                                                    light2: light2)
+            commandEncoder.setFragmentBytes(&fragmentUniforms, length: MemoryLayout<FragmentUniforms>.size, index: 0)
+            
+            commandEncoder.setVertexBytes(&vertexUniforms, length: MemoryLayout<VertexUniforms>.size, index: 1)
             commandEncoder.setRenderPipelineState(renderPipeline)
             commandEncoder.setDepthStencilState(depthStencilState)
             commandEncoder.setFragmentTexture(baseColorTexture, index: 0)
