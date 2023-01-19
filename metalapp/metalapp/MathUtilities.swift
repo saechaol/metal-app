@@ -25,7 +25,7 @@ extension float4x4 {
         let t = 1 - c
         self.init(
             SIMD4<Float>( t * x * x + c,      t * x * y + z * s,      t * x * z - y * s, 0),
-            SIMD4<Float>( t * x * y - z * s,  t * y * y - x,          t * y * z + x * s, 0),
+            SIMD4<Float>( t * x * y - z * s,  t * y * y + c,          t * y * z + x * s, 0),
             SIMD4<Float>( t * x * z + y * s,  t * y * z - x * s,      t * z * z + c, 0),
             SIMD4<Float>(                 0,                  0,                  0, 1)
         )
@@ -57,7 +57,7 @@ extension float4x4 {
             SIMD4<Float>(xx, 0, 0, 0),
             SIMD4<Float>(0, yy, 0, 0),
             SIMD4<Float>(0, 0, zz, zw),
-            SIMD4<Float>(0, 0, wz, 0)
+            SIMD4<Float>(0, 0, wz, 1)
         )
     }
 }

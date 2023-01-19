@@ -19,6 +19,7 @@ class Renderer: NSObject, MTKViewDelegate {
     
     let device: MTLDevice
     let commandQueue: MTLCommandQueue
+    let depthStencilState: MTLDepthStencilState
     var renderPipeline: MTLRenderPipelineState // create render pipeline state
     var vertexDescriptor: MDLVertexDescriptor
     var meshes: [MTKMesh] = []
@@ -42,6 +43,7 @@ class Renderer: NSObject, MTKViewDelegate {
          To maximize performance, Metal prefers vertex and fragment shaders to be compiled into a RenderPipelineState object
          */
         renderPipeline = Renderer.buildPipeline(device: device, view: view, vertexDescriptor: vertexDescriptor)
+        depthStencilState = Renderer.buildDepthStencilState(device: device)
         super.init()
         loadResources()
     }
@@ -124,6 +126,7 @@ class Renderer: NSObject, MTKViewDelegate {
         Tell Metal the format of the textures that will be drawn
          */
         pipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        pipelineDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
         
         /**
          Set vertex descriptor, so the pipeline understands how the data is laid out in the buffer
@@ -137,6 +140,22 @@ class Renderer: NSObject, MTKViewDelegate {
             fatalError("Could not create render pipeline state object: \(error)")
         }
         
+    }
+    
+    static func buildDepthStencilState(device: MTLDevice) -> MTLDepthStencilState {
+        let depthStencilDescriptor = MTLDepthStencilDescriptor()
+        /**
+         Determines whether a fragment passes the "depth test"
+         - a fragment that is closest to the camera for each pixel is kept, so we use a "less" comparison function
+         */
+        depthStencilDescriptor.depthCompareFunction = .less
+        
+        /**
+         Allows depth values of passing fragments to be written to depth buffer. Otherwise, no writes to the depth buffer would occur.
+         - some situations where this is not desired include particle rendering, but for opaque objects, it is preferred to have it enabled
+         */
+        depthStencilDescriptor.isDepthWriteEnabled = true
+        return device.makeDepthStencilState(descriptor: depthStencilDescriptor)!
     }
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
@@ -162,7 +181,7 @@ class Renderer: NSObject, MTKViewDelegate {
             time += 1 / Float(view.preferredFramesPerSecond)
             let angle = -time
             
-            let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 0.1)
+            let modelMatrix = float4x4(rotateAbout: SIMD3<Float>(0, 1, 0), by: angle) * float4x4(scaleBy: 1)
             let viewMatrix = float4x4(translateBy: SIMD3<Float>(0, 0, -2))
             
             let modelViewMatrix = viewMatrix * modelMatrix
@@ -173,6 +192,7 @@ class Renderer: NSObject, MTKViewDelegate {
             
             commandEncoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.size, index: 1)
             commandEncoder.setRenderPipelineState(renderPipeline)
+            commandEncoder.setDepthStencilState(depthStencilState)
             
             for mesh in meshes {
                 let vertexBuffer = mesh.vertexBuffers.first!
