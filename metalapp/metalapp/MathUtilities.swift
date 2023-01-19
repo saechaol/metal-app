@@ -8,6 +8,12 @@
 import Foundation
 import simd
 
+extension SIMD4<Float> {
+    var xyz: SIMD3<Float> {
+        return SIMD3<Float>(x, y, z)
+    }
+}
+
 extension float4x4 {
     init(scaleBy s: Float) {
         self.init(
@@ -59,5 +65,10 @@ extension float4x4 {
             SIMD4<Float>(0, 0, zz, zw),
             SIMD4<Float>(0, 0, wz, 1)
         )
+    }
+    
+    var normalMatrix: float3x3 {
+        let upperLeft = float3x3(self[0].xyz, self[1].xyz, self[2].xyz)
+        return upperLeft.transpose.inverse
     }
 }
