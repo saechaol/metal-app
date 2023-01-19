@@ -37,14 +37,12 @@ struct Uniforms {
 // VertexIn - incoming vertex data
 // vertexIn is attributed with [[stage_in]] to signify it is built by loading the vertex descriptor
 // Uniforms is where the transformation matrices are held
-vertex VertexOut vertex_main(VertexIn vertexIn [[stage_in]], constant Uniforms &uniforms [[buffer(1)]]) {
+vertex VertexOut vertex_main(VertexIn vertexIn [[stage_in]],
+                             constant Uniforms &uniforms [[buffer(1)]]) {
     VertexOut vertexOut;
     vertexOut.position = uniforms.projectionMatrix * uniforms.modelViewMatrix * float4(vertexIn.position, 1); // moves vertex position into clip space
-    // moves vertex position from model space to clip space
-    vertexOut.eyeNormal = uniforms.modelViewMatrix * float4(vertexIn.normal, 0);
-    // move normals into eye space
-    vertexOut.eyePosition = uniforms.modelViewMatrix * float4(vertexIn.position, 1);
-    // move position into eyespace
+    vertexOut.eyeNormal = uniforms.modelViewMatrix * float4(vertexIn.normal, 0); // move normals into eye space
+    vertexOut.eyePosition = uniforms.modelViewMatrix * float4(vertexIn.position, 1); // move position into eyespace
     vertexOut.texCoords = vertexIn.texCoords;
     return vertexOut;
 }
