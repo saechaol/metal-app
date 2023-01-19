@@ -113,9 +113,6 @@ class Renderer: NSObject, MTKViewDelegate {
         let vertexFunction = library.makeFunction(name: "vertex_main")
         let fragmentFunction = library.makeFunction(name: "fragment_main")
         
-        // configure the object that will tell Metal about the pipeline we want to create
-        // the render pipeline descriptor
-        
         /**
          Configure object that will tell Metal about the pipeline we want to create
          */
