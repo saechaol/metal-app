@@ -57,7 +57,7 @@ extension float4x4 {
             SIMD4<Float>(xx, 0, 0, 0),
             SIMD4<Float>(0, yy, 0, 0),
             SIMD4<Float>(0, 0, zz, zw),
-            SIMD4<Float>(0, 0, wz, 0)
+            SIMD4<Float>(0, 0, wz, 1)
         )
     }
 }
