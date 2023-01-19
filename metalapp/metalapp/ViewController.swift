@@ -27,7 +27,7 @@ class ViewController: UIViewController {
             views: ["mtkView": mtkView]))
         
         view.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "V: |[mtkView]|",
+            withVisualFormat: "V:|[mtkView]|",
             metrics: nil,
             views: ["mtkView": mtkView]))
     
